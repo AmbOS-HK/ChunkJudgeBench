@@ -43,7 +43,8 @@ def load_qa(qa_path: Path) -> list[dict]:
 
 
 def _contained(quote: str, chunk_text: str) -> bool:
-    return squash(quote) in squash(chunk_text)
+    q = squash(quote)
+    return bool(q) and q in squash(chunk_text)
 
 
 def _best_coverage(quote: str, chunks: Sequence[Chunk]) -> float:

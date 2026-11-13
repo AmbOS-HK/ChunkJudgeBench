@@ -11,9 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from chinese_chunk.evaluate import extract_units, load_corpus, load_qa  # noqa: E402
+from chinese_chunk.evaluate import _contained, extract_units, load_corpus, load_qa  # noqa: E402
 from chinese_chunk.splitters import build_chunker  # noqa: E402
-from chinese_chunk.textnorm import squash  # noqa: E402
+from chinese_chunk.textnorm import normalize, squash  # noqa: E402
 
 FAILS: list[str] = []
 
@@ -56,6 +56,31 @@ def main() -> int:
         doc = docs[item["doc"]]
         check(squash(item["gold_quote"]) in squash(doc),
               f"{item['qid']} 引文不在原文中")
+
+    # 对抗回归：空引文不得被判为命中（空串是任意串子串，需显式拒认）
+    check(not _contained("", "任意块文本"), "空引文被判定为命中")
+
+    # 对抗回归：未闭合的 HTML 表格 / 代码围栏不得整块丢失
+    malformed = {
+        "未闭合HTML表格": "<table>\n<tr><td>A</td></tr>",
+        "未闭合代码围栏": "```python\nprint(1)\n未收尾围栏",
+    }
+    for name, text in malformed.items():
+        mal_doc = normalize(text)
+        for strat in ("fixed", "sentence", "recursive", "structure"):
+            chunks = build_chunker(strat, max_chars=300, overlap=50).chunk("adv", mal_doc)
+            check(bool(chunks), f"{name}/{strat} 未产出任何块")
+            covered = "".join(squash(c.text) for c in chunks)
+            check(all(ch in covered for ch in squash(mal_doc)),
+                  f"{name}/{strat} 内容丢失")
+
+    # 对抗回归：极端下限不得产生纯空白空块
+    for text in ("The quick brown fox. " * 20, "- 项目一\n- 项目二\n" * 30):
+        edge_doc = normalize(text)
+        for strat in ("fixed", "sentence", "recursive", "structure"):
+            chunks = build_chunker(strat, max_chars=1, overlap=0).chunk("adv", edge_doc)
+            check(all(c.text.strip() for c in chunks),
+                  f"mc=1 {strat} 出现纯空白空块")
 
     # 结构单元覆盖：structure 策略下所有短单元都应完整落在某一块
     for size in (600,):

@@ -121,7 +121,7 @@ class BaseChunker:
         out: list[str] = []
         buf = ""
         for p in pieces:
-            if not p:
+            if not p.strip():
                 continue
             if len(buf) + len(joiner) + len(p) <= limit:
                 buf = p if not buf else buf + joiner + p
@@ -192,8 +192,12 @@ class SentenceChunker(BaseChunker):
             nonlocal buf
             if not buf:
                 return
+            span = doc[buf[0][1]:buf[-1][2]]
+            if not span.strip():
+                buf = []
+                return
             chunks.append(_finalize(
-                doc_id, len(chunks), doc[buf[0][1]:buf[-1][2]], buf[0][1], buf[-1][2],
+                doc_id, len(chunks), span, buf[0][1], buf[-1][2],
                 kind="text", heading_path=(), article_range="",
                 tokenizer=self.tokenizer,
             ))
@@ -478,6 +482,11 @@ class StructureFirstChunker(BaseChunker):
         flush_body(offset)
         if table_buf:
             cur.units.append(_Unit("\n".join(table_buf), table_start, offset, "table", path(), article_no, len(heading_stack)))
+        # 未闭合的 HTML 表格 / 代码围栏：文档结束仍没收尾标签时，兜底保留残余内容，避免整块丢失
+        if in_html_table and html_buf:
+            cur.units.append(_Unit("\n".join(html_buf), html_start, offset, "table", path(), article_no, len(heading_stack)))
+        if in_fence and fence_buf:
+            cur.units.append(_Unit("\n".join(fence_buf), fence_start, offset, "code", path(), article_no, len(heading_stack)))
         return [s for s in sections if s.units]
 
     # ---- 切分
@@ -508,6 +517,9 @@ class StructureFirstChunker(BaseChunker):
                 return
             start, end = units[0].start, units[-1].end
             body = text_override if text_override is not None else doc[start:end].strip()
+            if not body.strip():
+                pending = []
+                return
             arts = [u.article_no for u in units if u.article_no]
             art_range = ""
             if arts:
