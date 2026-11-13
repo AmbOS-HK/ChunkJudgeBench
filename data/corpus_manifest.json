@@ -1,0 +1,32 @@
+[
+  {
+    "name": "民法典.md",
+    "url": "https://zh.wikisource.org/w/api.php",
+    "note": "《中华人民共和国民法典》全文，中文维基文库（公有领域法律文本），按编/章/节/条组织",
+    "chars": 109993,
+    "lines": 2396,
+    "sha256": "10369781a2182de4ac63ffd26989daa9c3587484b1ae6c44e81b9c03e643bbbc",
+    "heading_like_lines": 1196,
+    "table_rows": 0
+  },
+  {
+    "name": "rust-course-README.md",
+    "url": "https://cdn.jsdelivr.net/gh/sunface/rust-course@main/README.md",
+    "note": "《Rust 语言圣经》中文 README，多级标题结构",
+    "chars": 4230,
+    "lines": 117,
+    "sha256": "5a0e2dc6ee28925994dd0136c91cb26f3e423e35c8538c32bbdd3df9ca73bac0",
+    "heading_like_lines": 4,
+    "table_rows": 0
+  },
+  {
+    "name": "coding-interview-university-cn.md",
+    "url": "https://raw.githubusercontent.com/jwasham/coding-interview-university/master/translations/README-cn.md",
+    "note": "CS 自学路线中文版 README，含列表与表格的长文档",
+    "chars": 95642,
+    "lines": 1902,
+    "sha256": "cd91c6d16c61c953a9cb2fb3b249eacd670fbf1734730c52bd593eff9561dd8d",
+    "heading_like_lines": 55,
+    "table_rows": 0
+  }
+]

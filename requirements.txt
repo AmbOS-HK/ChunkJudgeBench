@@ -1,0 +1,5 @@
+# 必装：仅用于抓取语料
+requests>=2.31
+
+# 可选：仅在评测/导出时使用 --tokenizer tiktoken 需要
+# tiktoken>=0.7
