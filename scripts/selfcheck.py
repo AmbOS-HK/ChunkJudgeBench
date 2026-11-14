@@ -1,6 +1,6 @@
 """全量自查：代码不变量、数据完整性、边界输入、可复现性、发布风险。
 
-运行：python scripts/selfcheck.py
+运行：python scripts/selfcheck.py（需要本地 data/corpus/；两条许可 WARN 属预期，不得靠提交语料消除）
 输出：控制台逐项结果 + reports/selfcheck.md
 """
 from __future__ import annotations
