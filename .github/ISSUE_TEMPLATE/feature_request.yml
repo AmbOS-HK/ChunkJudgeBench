@@ -1,0 +1,41 @@
+name: 功能 / 评测建议
+description: 提出新增策略、指标、文档或评测口径的改动
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本项目范围很窄：在**固定检索器**的前提下比较切片策略。请说明你的建议是否落在这个范围内。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及范围
+      options:
+        - 切片策略（新增或修复结构识别）
+        - 评测指标 / 口径
+        - 语料与问答集
+        - 文档
+        - 工程与打包
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 当前哪里不够用，是否有具体文档或数字支撑
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的做法
+      description: 如果是新指标，请给出定义与计算方式
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 对现有结论的影响
+      description: 是否会让现有指标不可比；是否需要重跑全部评测
+    validations:
+      required: false

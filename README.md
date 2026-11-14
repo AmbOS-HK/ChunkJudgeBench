@@ -30,10 +30,17 @@ scripts/
 data/
   corpus/         原始语料文本（不入库，需先运行抓取脚本；见「数据与许可」）
   corpus_manifest.json  语料来源、字符数、行数与 sha256
-  qa.jsonl        评测问答集（question / gold_quote / doc）
+  qa.jsonl        评测问答集（question / gold_quote / doc / source_license / quote_sha256）
 reports/          评测产物（results.csv、per_question.csv、chunk_benchmark.md，不入库）
-tests/            不变量自检（切片可定位、不超限、引文自洽）
-requirements.txt  依赖清单（requests 必装，tiktoken 可选）
+tests/
+  test_invariants.py  不变量自检（切片可定位、不超限、引文自洽；需要语料）
+  test_smoke.py       离线冒烟（不需要语料，CI 用）
+.github/          CI 工作流、Issue 与 PR 模板、dependabot
+pyproject.toml    打包与版本声明（pip install -e ".[fetch]"）
+NOTICE.md         第三方引文的授权标注与移除方式
+CONTRIBUTING.md   贡献流程与硬性约束
+SECURITY.md       漏洞报告渠道与威胁面
+requirements.txt  抓取语料用依赖（requests）
 ```
 
 ## 环境与依赖
@@ -44,9 +51,13 @@ requirements.txt  依赖清单（requests 必装，tiktoken 可选）
 
 其余功能均使用 Python 标准库，不依赖外部分词器。
 
-安装依赖：
+两种安装方式（任选其一）：
 
 ```bash
+# 方式一：可直接安装的包（含抓取依赖，并注册 chunkjudgebench 命令）
+pip install -e ".[fetch]"
+
+# 方式二：只装依赖清单
 pip install -r requirements.txt
 ```
 
@@ -103,11 +114,16 @@ structure 把所有 1260 个可容纳的结构单元都保住了，recursive 有
 ## 数据与许可
 
 - 自研代码以仓库根目录 LICENSE（MIT，Copyright (c) 2026 AmbOS-HK）为准。
-- **第三方语料不入库**：`data/corpus/` 已在 `.gitignore` 中排除，克隆后须先运行
+- **第三方语料正文不入库**：`data/corpus/` 已在 `.gitignore` 中排除，克隆后须先运行
   `python scripts/fetch_corpus.py` 从原始来源下载，再用 `--rebuild-manifest` 核对哈希。
   原因：`rust-course` 仓库无可识别许可证（其 README 明示不可修改后再分发），
   `coding-interview-university` 为 CC-BY-SA-4.0（要求署名并以相同协议共享），
   两者都与本仓库的 MIT 许可不兼容，随仓库发布将构成未经许可的再分发。
+- **但问答集里保留了逐字引文**：`data/qa.jsonl` 已入库，44 条 `gold_quote` 是从原文截取的
+  片段（民法典 34 条 / CIU 8 条 / rust-course 2 条，合计 4372 字符）。这部分会随仓库公开，
+  因此每条记录都带 `source_license`（`public-domain` / `CC-BY-SA-4.0` / `NOASSERTION`）
+  与 `quote_sha256`，由 `scripts/selfcheck.py` 强制校验。各来源的署名、授权状态与移除方法
+  见 [NOTICE.md](NOTICE.md)。
 - `民法典` 为公有领域法律文本，可自由引用；本仓库只在本地评测中使用全文，同样不入库。
 - 各文档来源 URL、字符数与哈希见 `data/corpus_manifest.json`。
 
@@ -118,3 +134,23 @@ structure 把所有 1260 个可容纳的结构单元都保住了，recursive 有
 - token 口径为非空白字符数，不等于任何具体模型的 token。
 - 结构识别依赖 Markdown 标题与「第X条」正则；PDF / 扫描件需先做版面还原。
 - 未做端到端回答质量评测（忠实度、答案正确率），本项目只覆盖检索证据层。
+
+## 测试与 CI
+
+```bash
+python tests/test_smoke.py        # 离线冒烟，不需要语料
+python tests/test_invariants.py   # 切片不变量，需要 data/corpus
+python scripts/selfcheck.py       # 全量自查，需要 data/corpus
+```
+
+CI 分两个作业（`.github/workflows/ci.yml`）：
+
+- **离线检查**：Python 3.10 / 3.13 双版本，编译 + 离线冒烟 + 打包元数据 + CLI 可用性；
+- **全量自查**：抓取语料后跑不变量与自查，产物上传为 artifact。因为语料抓取依赖外部
+  站点，该作业只在推送 `main` 与手动触发时运行。
+
+## 贡献与引用
+
+- 贡献流程与硬性约束见 [CONTRIBUTING.md](CONTRIBUTING.md)，行为准则见
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)，漏洞报告见 [SECURITY.md](SECURITY.md)。
+- 引用本项目时请注明仓库地址与所使用的提交或版本；评测结论请连同样本量与口径一起引用。
