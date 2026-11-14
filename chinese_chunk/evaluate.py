@@ -20,7 +20,7 @@ from typing import Iterable, Sequence
 
 from .retrieval import BM25Index
 from .splitters import Chunk, build_chunker
-from .textnorm import normalize, squash
+from .textnorm import count_tokens, normalize, squash
 
 _SENT_TAIL = "。！？；…!?;"
 _CLOSERS = "”」』）)》】\"'"
@@ -40,6 +40,108 @@ def load_qa(qa_path: Path) -> list[dict]:
         if line:
             items.append(json.loads(line))
     return items
+
+
+def load_chunks_jsonl(path: Path | str) -> list[Chunk]:
+    """从外部 JSONL 还原 Chunk，不重新切分。
+
+    每行一个对象，字段为 doc、index、text、start_offset、end_offset、heading_path。
+    heading_path 可以是字符串数组，或用「 > 」连接的字符串。
+    也接受本仓库 chunk 导出的别名：doc_id、seq、start、end，以及可选的 chunk_id、kind。
+    """
+    path = Path(path)
+    chunks: list[Chunk] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path} 第 {lineno} 行：不是合法 JSON（{exc.msg}）") from exc
+        if not isinstance(obj, dict):
+            raise ValueError(f"{path} 第 {lineno} 行：必须是 JSON 对象")
+        chunks.append(_chunk_from_record(obj, path, lineno))
+    return chunks
+
+
+def _require(obj: dict, names: tuple[str, ...], path: Path, lineno: int):
+    for name in names:
+        if name in obj and obj[name] is not None:
+            return obj[name]
+    raise ValueError(f"{path} 第 {lineno} 行：缺少 {' / '.join(names)}")
+
+
+def _as_int(value, name: str, path: Path, lineno: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{path} 第 {lineno} 行：{name} 必须是整数")
+    return value
+
+
+def _as_str(value, name: str, path: Path, lineno: int) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{path} 第 {lineno} 行：{name} 必须是字符串")
+    return value
+
+
+def _heading_path(value, path: Path, lineno: int) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return ()
+        if " > " in text:
+            return tuple(part.strip() for part in text.split(" > ") if part.strip())
+        return (text,)
+    if isinstance(value, (list, tuple)):
+        parts: list[str] = []
+        for item in value:
+            if not isinstance(item, str):
+                raise ValueError(f"{path} 第 {lineno} 行：heading_path 的每一项必须是字符串")
+            parts.append(item)
+        return tuple(parts)
+    raise ValueError(f"{path} 第 {lineno} 行：heading_path 必须是字符串或字符串数组")
+
+
+def _chunk_from_record(obj: dict, path: Path, lineno: int) -> Chunk:
+    doc_id = _as_str(_require(obj, ("doc", "doc_id"), path, lineno), "doc", path, lineno)
+    if not doc_id.strip():
+        raise ValueError(f"{path} 第 {lineno} 行：doc 不能为空")
+    text = _as_str(_require(obj, ("text",), path, lineno), "text", path, lineno)
+    seq = _as_int(_require(obj, ("index", "seq"), path, lineno), "index", path, lineno)
+    if seq < 0:
+        raise ValueError(f"{path} 第 {lineno} 行：index 不能为负")
+    start = _as_int(
+        _require(obj, ("start_offset", "start"), path, lineno), "start_offset", path, lineno,
+    )
+    end = _as_int(
+        _require(obj, ("end_offset", "end"), path, lineno), "end_offset", path, lineno,
+    )
+    if start < 0 or end < start:
+        raise ValueError(f"{path} 第 {lineno} 行：end_offset 必须大于等于 start_offset，且不能为负")
+    heading = _heading_path(obj["heading_path"], path, lineno) if "heading_path" in obj else ()
+    kind = "text"
+    if obj.get("kind") is not None:
+        kind = _as_str(obj["kind"], "kind", path, lineno)
+    chunk_id = f"{doc_id}#{seq:04d}"
+    if obj.get("chunk_id"):
+        chunk_id = _as_str(obj["chunk_id"], "chunk_id", path, lineno)
+    return Chunk(
+        chunk_id=chunk_id,
+        doc_id=doc_id,
+        seq=seq,
+        text=text,
+        start=start,
+        end=end,
+        kind=kind,
+        heading_path=heading,
+        article_range=_as_str(obj["article_range"], "article_range", path, lineno) if obj.get("article_range") else "",
+        parent_id=_as_str(obj["parent_id"], "parent_id", path, lineno) if obj.get("parent_id") else "",
+        parent_text=_as_str(obj["parent_text"], "parent_text", path, lineno) if obj.get("parent_text") else "",
+        tokens=count_tokens(text, "char"),
+        tokens_cjk=count_tokens(text, "cjk"),
+    )
 
 
 def _contained(quote: str, chunk_text: str) -> bool:
@@ -163,7 +265,44 @@ def evaluate_strategy(
     all_chunks: list[Chunk] = []
     for doc_id, text in docs.items():
         all_chunks.extend(chunker.chunk(doc_id, text))
+    res = _score_chunks(
+        docs, qa, all_chunks,
+        strategy=strategy, max_chars=max_chars, overlap=overlap, top_k=top_k,
+    )
+    return res, all_chunks
 
+
+def evaluate_chunks(
+    docs: dict[str, str],
+    qa: Sequence[dict],
+    chunks: Sequence[Chunk],
+    *,
+    label: str = "external",
+    max_chars: int | None = None,
+    overlap: int = 0,
+    top_k: int = 5,
+) -> StrategyResult:
+    """用已有切片计算与 evaluate_strategy 相同的指标，不调用切分器。"""
+    all_chunks = list(chunks)
+    if max_chars is None:
+        max_chars = max((len(c.text) for c in all_chunks), default=0)
+    return _score_chunks(
+        docs, qa, all_chunks,
+        strategy=label, max_chars=max_chars, overlap=overlap, top_k=top_k,
+    )
+
+
+def _score_chunks(
+    docs: dict[str, str],
+    qa: Sequence[dict],
+    all_chunks: Sequence[Chunk],
+    *,
+    strategy: str,
+    max_chars: int,
+    overlap: int,
+    top_k: int,
+) -> StrategyResult:
+    all_chunks = list(all_chunks)
     index = BM25Index(all_chunks)
 
     intact = 0
@@ -241,7 +380,7 @@ def evaluate_strategy(
         mrr=round(rr_sum / len(qa), 4) if qa else 0.0,
         details=details,
     )
-    return res, all_chunks
+    return res
 
 
 def _percentile(sorted_values: Sequence[int], q: float) -> float:
