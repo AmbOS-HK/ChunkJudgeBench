@@ -12,6 +12,9 @@
 - 豆包：负责规划、查检与验收；Grok Bot 完成一个 PR 后停止继续施工，等待验收。
 - 本仓与 `ChineseChunkJudge` 并存且独立，不是新旧替代关系；不要把两个仓的代码、历史或任务混用。
 - 只允许普通提交和 PR。禁止直接推 `main`、强推、改写历史、删库、创建 Release 或擅自修改发布标签。
+- 「禁止直接推 `main`」是项目纪律：文档、功能与修复都走分支和 PR。撰写本文时（2026-11-14）
+  GitHub 上 `main` 的分支保护未开启（`protected` 为 false），所以纪律和仓库设置是两件事。
+  是否启用分支保护由项目所有者决定；本文不改仓库设置，也不宣称保护已经加上。
 
 ## 1. 项目定位（不要扩大范围）
 
@@ -24,9 +27,13 @@
 
 - 语言：Python 3.13，核心逻辑只用标准库；联网抓语料用 `requests`。
 - `data/corpus/`、`out/`、`reports/` 已在 `.gitignore` 中，语料不入库，本地文件保留。
-- 全量自查：切片不变量、表格/代码块识别、边界异常输入、可复现性、报告一致性均通过。
+- 三条检查对语料的要求不同，全新克隆不能把后两项的失败当成产品回归：
+  - `tests/test_smoke.py` 是离线冒烟，不需要语料。CI 的离线作业只跑它。
+  - `tests/test_invariants.py` 与 `scripts/selfcheck.py` 需要本地已经抓取的 `data/corpus/`（`python scripts/fetch_corpus.py`）。没有这份本地语料时，这两项按设计失败。
+- 全量自查（切片不变量、表格/代码块识别、边界异常输入、可复现性、报告一致性）在已经备好 `data/corpus/` 的环境中通过。
 - 2026-11-14 交接前实测：`tests/test_smoke.py`、`tests/test_invariants.py`、`scripts/selfcheck.py`
-  全部退出码为 0；17 项自查 0 FAIL。两条 WARN 是已知的第三方语料许可限制，不得通过提交语料正文来“消除”。
+  全部退出码为 0；17 项自查 0 FAIL。该记录取自已经备好 `data/corpus/` 的环境，无语料的全新克隆不能原样复现。
+- 该次自查的两条 WARN 是预期中的第三方语料许可限制：`rust-course` 无可识别许可证，`coding-interview-university` 为 CC-BY-SA-4.0。不得通过提交语料正文来“消除”这两条 WARN。
 - 工程设施（2026-11-14 补齐）：`pyproject.toml` 打包与 `chunkjudgebench` 命令、CI（离线检查 +
   全量自查）、Issue/PR 模板、Dependabot、`.gitattributes` 显式 LF；`v0.1.0` tag 与 Release
   已发布；GitHub 社区健康度 100%。
@@ -72,7 +79,12 @@ python tests/test_invariants.py
 python scripts/selfcheck.py
 ```
 
-先确认基线通过再改代码。语料抓取依赖外部站点；若失败，记录真实错误并停止，不得换用未经核实的镜像或伪造语料。
+先确认基线通过再改代码。其中 `tests/test_smoke.py` 不需要语料；
+`tests/test_invariants.py` 与 `scripts/selfcheck.py` 依赖刚刚抓到的本地 `data/corpus/`。
+没有这份语料时，后两项失败是预期，不是产品回归。语料抓取依赖外部站点；若失败，记录真实错误并停止，
+不得换用未经核实的镜像或伪造语料，也不得把语料正文提交进仓库来让自查变绿。
+自查里关于 `rust-course` 与 `coding-interview-university` 的两条许可 WARN 是已知限制，
+不得通过提交语料正文来消除。
 
 ## 6. 施工顺序与验收标准
 
@@ -115,8 +127,8 @@ python scripts/selfcheck.py
 - `chinese_chunk/evaluate.py` / `report.py` / `cli.py`：评测、报告、命令行。
 - `scripts/fetch_corpus.py`：公开语料抓取与 manifest。
 - `scripts/build_qa.py`：44 条问答生成与校验。
-- `scripts/selfcheck.py`：全量自查。
-- `tests/test_invariants.py`：切片不变量。
+- `scripts/selfcheck.py`：全量自查（需要本地 `data/corpus/`；两条许可 WARN 属预期）。
+- `tests/test_invariants.py`：切片不变量（需要本地 `data/corpus/`）。
 - `tests/test_smoke.py`：不依赖语料的离线冒烟。
 - `data/qa.jsonl`：问答集（已跟踪）。
 - `data/corpus_manifest.json`：来源与哈希（已跟踪）。
@@ -147,6 +159,7 @@ PR 描述必须包含：
 
 - 指标并列或样本不足要直说，不推测、不夸大、不写讨好性结论。
 - 不提交 `data/corpus/`、第三方语料正文、真实业务数据、凭据或本地绝对路径。
+  自查的两条许可 WARN 是已知限制，不得靠提交语料正文来消除。
 - 新增问答引文必须同时补 `source_license` 与 `quote_sha256`；含原文引文的逐题报告不得公开再分发。
 - 核心路径只使用标准库；不得擅自改变检索器参数、命中判定、token 口径或基线数据。
 - 文本统一 UTF-8、LF；不做无关重排，不修改与本任务无关的文件。

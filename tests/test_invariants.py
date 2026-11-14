@@ -1,6 +1,6 @@
 """不变量自检：切片必须满足的可验证条件，防止出现「块内容与原文对不上」这类静默错误。
 
-运行：python tests/test_invariants.py
+运行：python tests/test_invariants.py（需要本地 data/corpus/；没有语料时失败是预期）
 """
 from __future__ import annotations
 
