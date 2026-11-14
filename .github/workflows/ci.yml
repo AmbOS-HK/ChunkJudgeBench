@@ -69,6 +69,9 @@ jobs:
       - name: 切片不变量
         run: python tests/test_invariants.py
 
+      - name: 生成评测报告（selfcheck 会核对报告与指标一致性）
+        run: python -m chinese_chunk.cli eval
+
       - name: 全量自查
         run: python scripts/selfcheck.py
 
