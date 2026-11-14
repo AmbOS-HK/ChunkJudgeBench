@@ -3,7 +3,7 @@
 更新时间：2026-11-14
 工作目录：`D:\ChunkJudgeBench`
 远端仓库：`https://github.com/AmbOS-HK/ChunkJudgeBench.git`（公开）
-交接基线：`main = e1adacf`，发布标签：`v0.1.0`
+交接基线：`main = 5997d78`，发布标签：`v0.1.0`
 
 ## 0. 角色与交接方式
 
