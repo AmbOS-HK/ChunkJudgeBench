@@ -1,5 +1,5 @@
-# 必装：仅用于抓取语料
-requests>=2.31
+# 必装：仅用于抓取语料（评测与切片本身只用标准库）
+requests>=2.31,<3
 
-# 可选：仅在评测/导出时使用 --tokenizer tiktoken 需要
-# tiktoken>=0.7
+# 可选：仅在 --tokenizer tiktoken 时需要
+# tiktoken>=0.7,<1
