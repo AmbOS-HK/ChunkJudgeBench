@@ -49,9 +49,7 @@ python scripts/selfcheck.py         # 全量自查（需要本地 data/corpus；
 ## 分支与 PR
 
 - `main` 为唯一长期分支。不直接推 `main` 是项目纪律：文档、功能与修复都走分支和 PR。
-- 是否对 `main` 启用 GitHub 分支保护，由项目所有者决定。本文不修改这项仓库设置，
-  也不宣称保护已经开启。撰写时（2026-11-14）`main` 的 `protected` 为 false；
-  纪律和仓库设置是两件事。
+- `main` 已保护，禁止直推 `main`。全量联网自查不是必过检查。
 - PR 描述里写：改了什么、为什么、怎么验证（贴关键输出）。
 - PR 模板见 `.github/pull_request_template.md`。
 
