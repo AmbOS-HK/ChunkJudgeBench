@@ -12,9 +12,10 @@
 ## 提交前必须跑的三件事
 
 ```bash
-python tests/test_smoke.py          # 离线冒烟（不需要语料）
-python tests/test_invariants.py     # 切片不变量（需要本地 data/corpus）
-python scripts/selfcheck.py         # 全量自查（需要本地 data/corpus；两条许可 WARN 属预期）
+python tests/test_smoke.py            # 离线冒烟（不需要语料）
+python tests/test_external_chunks.py  # 外部切片加载与评测（不需要语料）
+python tests/test_invariants.py       # 切片不变量（需要本地 data/corpus）
+python scripts/selfcheck.py           # 全量自查（需要本地 data/corpus；两条许可 WARN 属预期）
 ```
 
 只要改动了 `chinese_chunk/splitters.py`、`textnorm.py`、`retrieve` 相关逻辑，
@@ -55,7 +56,7 @@ python scripts/selfcheck.py         # 全量自查（需要本地 data/corpus；
 
 ## 空语料环境
 
-`tests/test_smoke.py` 是离线冒烟，不需要语料，CI 的离线作业只跑它。
+`tests/test_smoke.py` 是离线冒烟，`tests/test_external_chunks.py` 覆盖外部 JSONL 切片，两者都不需要语料。CI 的离线作业跑这两项。
 没有本地 `data/corpus/` 时，`tests/test_invariants.py` 与 `scripts/selfcheck.py` 会按设计失败；
 这不是产品回归。`scripts/selfcheck.py` 关于 `rust-course`（无可识别许可证）和
 `coding-interview-university`（CC-BY-SA-4.0）的两条 WARN 是预期的许可限制，

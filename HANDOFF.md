@@ -26,7 +26,7 @@
 - 语言：Python 3.13，核心逻辑只用标准库；联网抓语料用 `requests`。
 - `data/corpus/`、`out/`、`reports/` 已在 `.gitignore` 中，语料不入库，本地文件保留。
 - 三条检查对语料的要求不同，全新克隆不能把后两项的失败当成产品回归：
-  - `tests/test_smoke.py` 是离线冒烟，不需要语料。CI 的离线作业只跑它。
+  - `tests/test_smoke.py` 与 `tests/test_external_chunks.py` 都不需要语料。CI 的离线作业跑这两项。
   - `tests/test_invariants.py` 与 `scripts/selfcheck.py` 需要本地已经抓取的 `data/corpus/`（`python scripts/fetch_corpus.py`）。没有这份本地语料时，这两项按设计失败。
 - 全量自查（切片不变量、表格/代码块识别、边界异常输入、可复现性、报告一致性）在已经备好 `data/corpus/` 的环境中通过。
 - 2026-11-14 交接前实测：`tests/test_smoke.py`、`tests/test_invariants.py`、`scripts/selfcheck.py`
@@ -123,11 +123,13 @@ python scripts/selfcheck.py
 - `chinese_chunk/textnorm.py`：规范化、分句、降级切分。
 - `chinese_chunk/retrieval.py`：字符二元组 BM25。
 - `chinese_chunk/evaluate.py` / `report.py` / `cli.py`：评测、报告、命令行。
+- 外部切片：`python -m chinese_chunk.cli eval --chunks <jsonl> --label <name>` 跳过内置切分，复用现有指标。不传 `--chunks` 时默认评测与基线表不变。
 - `scripts/fetch_corpus.py`：公开语料抓取与 manifest。
 - `scripts/build_qa.py`：44 条问答生成与校验。
 - `scripts/selfcheck.py`：全量自查（需要本地 `data/corpus/`；两条许可 WARN 属预期）。
 - `tests/test_invariants.py`：切片不变量（需要本地 `data/corpus/`）。
 - `tests/test_smoke.py`：不依赖语料的离线冒烟。
+- `tests/test_external_chunks.py`：外部 JSONL 切片的加载与评测，不依赖语料。
 - `data/qa.jsonl`：问答集（已跟踪）。
 - `data/corpus_manifest.json`：来源与哈希（已跟踪）。
 - `NOTICE.md`：第三方引文的授权标注与移除方式。

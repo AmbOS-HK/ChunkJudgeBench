@@ -40,6 +40,9 @@ jobs:
       - name: 离线冒烟（不需要语料）
         run: python tests/test_smoke.py
 
+      - name: 外部切片评测（不需要语料）
+        run: python tests/test_external_chunks.py
+
       - name: 打包元数据校验
         run: python -m pip wheel . --no-deps -w dist
 
