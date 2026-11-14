@@ -1,8 +1,17 @@
-# ChunkJudgeBench 维护说明
+# ChunkJudgeBench 维护与 Grok Bot 交接说明
 
-更新时间：2026-11-13
+更新时间：2026-11-14
 工作目录：`D:\ChunkJudgeBench`
 远端仓库：`https://github.com/AmbOS-HK/ChunkJudgeBench.git`（公开）
+交接基线：`main = d0efec6`，发布标签：`v0.1.0`
+
+## 0. 角色与交接方式
+
+- 项目所有者：决定范围、数据、模型和发布事项。
+- Grok Bot：按本文任务顺序施工，每个任务单独建分支、单独提 PR。
+- 豆包：负责规划、查检与验收；Grok Bot 完成一个 PR 后停止继续施工，等待验收。
+- 本仓与 `ChineseChunkJudge` 并存且独立，不是新旧替代关系；不要把两个仓的代码、历史或任务混用。
+- 只允许普通提交和 PR。禁止直接推 `main`、强推、改写历史、删库、创建 Release 或擅自修改发布标签。
 
 ## 1. 项目定位（不要扩大范围）
 
@@ -16,6 +25,8 @@
 - 语言：Python 3.13，核心逻辑只用标准库；联网抓语料用 `requests`。
 - `data/corpus/`、`out/`、`reports/` 已在 `.gitignore` 中，语料不入库，本地文件保留。
 - 全量自查：切片不变量、表格/代码块识别、边界异常输入、可复现性、报告一致性均通过。
+- 2026-11-14 交接前实测：`tests/test_smoke.py`、`tests/test_invariants.py`、`scripts/selfcheck.py`
+  全部退出码为 0；17 项自查 0 FAIL。两条 WARN 是已知的第三方语料许可限制，不得通过提交语料正文来“消除”。
 - 工程设施（2026-11-14 补齐）：`pyproject.toml` 打包与 `chunkjudgebench` 命令、CI（离线检查 +
   全量自查）、Issue/PR 模板、Dependabot、`.gitattributes` 显式 LF；`v0.1.0` tag 与 Release
   已发布；GitHub 社区健康度 100%。
@@ -48,18 +59,55 @@
 4. 表格自检未剔除标题路径前缀造成误报；已修。
 5. manifest 哈希口径误用规范化文本对比原始文件，属自检误报；已修，并支持 `--rebuild-manifest`。
 
-## 5. 工程待办（按优先级）
+## 5. Grok Bot 拉取与开工
 
-1. 用真实业务语料复测（数据由使用者提供），问答集扩到 100 条以上。
-2. 接入实际 embedding + rerank，补端到端回答正确率评测。
-3. 补同一父节点下的小节点合并，避免碎列表文档过度切分。
-4. 补 HTML 标题识别（如 `<h1>`）、列表内嵌标题识别。
-5. PDF/扫描件走 MinerU 或 Docling 解析后再进本流程。
-6. 已完成：`pyproject.toml`、CI（离线 + 全量自查）、`v0.1.0` Release。剩余：把 `tests/` 改成
-   pytest 形式、把 `StructureFirstChunker` 固化成稳定对外 API，并在 README 明确 `max_chars`
-   是字符不是 token。
+```bash
+git clone https://github.com/AmbOS-HK/ChunkJudgeBench.git
+cd ChunkJudgeBench
+git switch -c grok/pytest-migration origin/main
+python -m pip install -e ".[fetch,dev]"
+python scripts/fetch_corpus.py
+python tests/test_smoke.py
+python tests/test_invariants.py
+python scripts/selfcheck.py
+```
 
-## 6. 关键文件
+先确认基线通过再改代码。语料抓取依赖外部站点；若失败，记录真实错误并停止，不得换用未经核实的镜像或伪造语料。
+
+## 6. 施工顺序与验收标准
+
+### PR-01：迁移到 pytest（首个任务，只做这一项）
+
+- 把 `tests/test_smoke.py` 与 `tests/test_invariants.py` 的断言迁移为 pytest 测试，保持原有测试覆盖，不改切片与检索行为。
+- 更新 CI 与文档中的测试命令；无语料环境仍可单独运行离线测试。
+- 验收：`pytest -q tests/test_smoke.py` 通过；有语料时 `pytest -q` 与 `python scripts/selfcheck.py` 通过；CI 配置与 README、CONTRIBUTING 不互相矛盾。
+- 完成后提交 PR 并停止，不要顺带做 API、切片算法或格式化改造。
+
+### PR-02：固化公开切片 API（PR-01 验收后）
+
+- 明确包级公开入口、`Chunk` 返回结构和兼容性约定，保持现有 CLI 可用。
+- README 明确 `max_chars` 是字符口径而非模型 token，并说明结构标题前缀与正文上限的关系。
+- 验收：公开 API 有直接测试；全新克隆安装后可按 README 示例调用；不改变现有评测数字。
+
+### PR-03：同一父节点的小节点合并（PR-02 验收后）
+
+- 只合并同一父结构下的小节点，不跨标题、不拆表格/代码原子块、不破坏正文回溯与块上限。
+- 新增碎列表、连续短标题、长短混合单元的回归测试。
+- 验收：列出合并前后块数与指标差异；三种测试/自查全过；若指标变化，同步 README 摘要并解释原因。
+
+### PR-04：HTML 标题与列表内嵌标题识别（PR-03 验收后）
+
+- 覆盖 `<h1>` 至 `<h6>`、列表项中的 Markdown 标题，以及混合 Markdown/HTML 文档。
+- 保持 HTML 表格与代码块原子化，不向核心路径引入第三方依赖。
+- 验收：新增正反对例；三种测试/自查全过；报告任何不能可靠识别的结构，不宣称支持完整 HTML 解析。
+
+### 等待项目所有者输入，不得擅自施工
+
+1. 真实业务语料与 100 条以上问答：等待所有者提供数据和授权，不得自行收集或编造。
+2. embedding、rerank 与端到端回答评测：等待所有者指定模型、服务方式、数据及验收指标。
+3. PDF/扫描件：等待所有者在 MinerU、Docling 或其他解析器之间作出选择；解析依赖不得进入核心包。
+
+## 7. 关键文件
 
 - `chinese_chunk/splitters.py`：四种策略与生产切片器。
 - `chinese_chunk/textnorm.py`：规范化、分句、降级切分。
@@ -69,24 +117,37 @@
 - `scripts/build_qa.py`：44 条问答生成与校验。
 - `scripts/selfcheck.py`：全量自查。
 - `tests/test_invariants.py`：切片不变量。
+- `tests/test_smoke.py`：不依赖语料的离线冒烟。
 - `data/qa.jsonl`：问答集（已跟踪）。
 - `data/corpus_manifest.json`：来源与哈希（已跟踪）。
-- `NOTICE.md`：第三方引文的授权标注与移除方式（2026-11-14 新增）。
+- `NOTICE.md`：第三方引文的授权标注与移除方式。
 - `.github/workflows/ci.yml`：离线检查与全量自查。
-- `reports/`：本地评测产物，被 gitignore。
-- `out/`：切片 JSONL 导出，被 gitignore。
+- `reports/`、`out/`：本地评测产物，被 gitignore，不随 PR 提交。
 
-## 7. 常用命令
+## 8. 修改切片逻辑后的必跑命令
 
-```
-python scripts/selfcheck.py
+```bash
+pytest -q
 python -m chinese_chunk.cli eval
-python -m chinese_chunk.cli chunk --strategy structure --max-chars 600
-python scripts/fetch_corpus.py --rebuild-manifest
+python scripts/selfcheck.py
 ```
 
-## 8. 维护约束
+`reports/` 与 `out/` 虽不入库，但若摘要数字变化，必须把变化写入 PR 和 README。
+
+## 9. PR 交付格式与维护约束
+
+PR 描述必须包含：
+
+1. 任务编号、分支名、改动文件和改动原因。
+2. 实际执行的命令、退出结果和关键输出，不得只写“已测试”。
+3. 修改算法时的前后指标对比；无变化也要明确写“指标未变”。
+4. 未解决项、外部依赖和需要所有者决定的问题。
+
+硬性约束：
 
 - 指标并列或样本不足要直说，不推测、不夸大、不写讨好性结论。
-- 不要重新把 `data/corpus/` 加入 git 跟踪。
-- 修改切片逻辑后必须重跑不变量测试、自查和评测，并更新报告；引用块数时以当前磁盘文件为准。
+- 不提交 `data/corpus/`、第三方语料正文、真实业务数据、凭据或本地绝对路径。
+- 新增问答引文必须同时补 `source_license` 与 `quote_sha256`；含原文引文的逐题报告不得公开再分发。
+- 核心路径只使用标准库；不得擅自改变检索器参数、命中判定、token 口径或基线数据。
+- 文本统一 UTF-8、LF；不做无关重排，不修改与本任务无关的文件。
+- 不宣称“生产成熟”“全面最优”或“符合国家标准”；本项目只覆盖检索证据层。
