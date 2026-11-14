@@ -16,6 +16,9 @@
 - 语言：Python 3.13，核心逻辑只用标准库；联网抓语料用 `requests`。
 - `data/corpus/`、`out/`、`reports/` 已在 `.gitignore` 中，语料不入库，本地文件保留。
 - 全量自查：切片不变量、表格/代码块识别、边界异常输入、可复现性、报告一致性均通过。
+- 工程设施（2026-11-14 补齐）：`pyproject.toml` 打包与 `chunkjudgebench` 命令、CI（离线检查 +
+  全量自查）、Issue/PR 模板、Dependabot、`.gitattributes` 显式 LF；`v0.1.0` tag 与 Release
+  已发布；GitHub 社区健康度 100%。
 
 ## 3. 已验证的评测结果（不要夸大）
 
@@ -52,7 +55,9 @@
 3. 补同一父节点下的小节点合并，避免碎列表文档过度切分。
 4. 补 HTML 标题识别（如 `<h1>`）、列表内嵌标题识别。
 5. PDF/扫描件走 MinerU 或 Docling 解析后再进本流程。
-6. 补 `pyproject.toml`、pytest、CI，把 `StructureFirstChunker` 固化成稳定 API，并注明 `max_chars` 是字符不是 token。
+6. 已完成：`pyproject.toml`、CI（离线 + 全量自查）、`v0.1.0` Release。剩余：把 `tests/` 改成
+   pytest 形式、把 `StructureFirstChunker` 固化成稳定对外 API，并在 README 明确 `max_chars`
+   是字符不是 token。
 
 ## 6. 关键文件
 
@@ -66,6 +71,8 @@
 - `tests/test_invariants.py`：切片不变量。
 - `data/qa.jsonl`：问答集（已跟踪）。
 - `data/corpus_manifest.json`：来源与哈希（已跟踪）。
+- `NOTICE.md`：第三方引文的授权标注与移除方式（2026-11-14 新增）。
+- `.github/workflows/ci.yml`：离线检查与全量自查。
 - `reports/`：本地评测产物，被 gitignore。
 - `out/`：切片 JSONL 导出，被 gitignore。
 
