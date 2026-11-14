@@ -103,6 +103,13 @@ def check_qa(docs: dict[str, str]) -> None:
             fail("问答集", f"{q['qid']} 引文是问题子串，检索会被原文命中而虚高")
         if len(q["question"]) < 8:
             warn("问答集", f"{q['qid']} 问题过短，可能只靠关键词命中")
+        # 引文会被公开再分发，逐条必须带授权标识与内容摘要（见 NOTICE.md）
+        lic = q.get("source_license")
+        if lic not in ("public-domain", "CC-BY-SA-4.0", "NOASSERTION"):
+            fail("问答集", f"{q['qid']} 缺少可识别的 source_license：{lic!r}")
+        digest = hashlib.sha256(quote.encode("utf-8")).hexdigest()
+        if q.get("quote_sha256") != digest:
+            fail("问答集", f"{q['qid']} quote_sha256 与 gold_quote 不一致")
     per_doc = {d: sum(1 for q in qa if q["doc"] == d) for d in docs}
     ok("问答集", f"{len(qa)} 条，分布 {per_doc}")
 

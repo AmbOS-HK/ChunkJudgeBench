@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -18,6 +19,22 @@ CORPUS = ROOT / "data" / "corpus"
 OUT = ROOT / "data" / "qa.jsonl"
 
 LAW = "民法典"
+
+# 每条问答在公开仓库里会被再分发，因此必须逐条标明引文所属来源的授权状态，
+# 而不是只在 README 里笼统说明「第三方语料不入库」。见 NOTICE.md。
+DOC_LICENSE = {
+    LAW: "public-domain",
+    "coding-interview-university-cn": "CC-BY-SA-4.0",
+    "rust-course-README": "NOASSERTION",
+}
+
+
+def license_of(doc_id: str) -> str:
+    return DOC_LICENSE[doc_id]
+
+
+def quote_digest(quote: str) -> str:
+    return hashlib.sha256(quote.encode("utf-8")).hexdigest()
 
 # (qid, doc, question, 条号)
 ARTICLE_SPECS = [
@@ -135,6 +152,7 @@ def main() -> int:
         records.append({
             "qid": qid, "doc": doc_id, "question": question,
             "gold_quote": quote, "source": f"《民法典》{article}", "type": "article",
+            "source_license": license_of(doc_id), "quote_sha256": quote_digest(quote),
         })
 
     for qid, doc_id, question, anchor in ANCHOR_SPECS:
@@ -147,6 +165,7 @@ def main() -> int:
         records.append({
             "qid": qid, "doc": doc_id, "question": question,
             "gold_quote": quote, "source": anchor, "type": "prose",
+            "source_license": license_of(doc_id), "quote_sha256": quote_digest(quote),
         })
 
     # 校验
