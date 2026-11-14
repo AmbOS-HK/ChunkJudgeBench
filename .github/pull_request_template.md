@@ -9,6 +9,7 @@
 ## 怎么验证的
 
 - [ ] `python tests/test_smoke.py`
+- [ ] `python tests/test_external_chunks.py`（不需要语料）
 - [ ] `python tests/test_invariants.py`（需要 `data/corpus`）
 - [ ] `python scripts/selfcheck.py`（需要 `data/corpus`；两条许可 WARN 属预期，不得靠提交语料消除）
 - [ ] 改了切片逻辑时重跑 `python -m chinese_chunk.cli eval` 并更新 README 的「评测结果摘要」

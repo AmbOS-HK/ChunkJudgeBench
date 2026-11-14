@@ -35,6 +35,7 @@ reports/          评测产物（results.csv、per_question.csv、chunk_benchmar
 tests/
   test_invariants.py  不变量自检（切片可定位、不超限、引文自洽；需要语料）
   test_smoke.py       离线冒烟（不需要语料，CI 用）
+  test_external_chunks.py  外部 JSONL 切片的加载与评测（不需要语料）
 .github/          CI 工作流、Issue 与 PR 模板、dependabot
 pyproject.toml    打包与版本声明（pip install -e ".[fetch]"）
 NOTICE.md         第三方引文的授权标注与移除方式
@@ -88,6 +89,30 @@ python -m chinese_chunk.cli chunk \
 - `--overlap`：重叠字符数，默认 `80`
 - `--tokenizer`：`char`（非空白字符数，默认）/ `cjk` / `tiktoken`
 
+### 评测已经切好的块
+
+传入 `--chunks` 时跳过内置切分，用同一套指标评测外部 JSONL。不传 `--chunks` 时仍走原来的策略 × 尺寸网格，默认评测数字不变。
+
+```bash
+python -m chinese_chunk.cli eval \
+  --corpus data/corpus --qa data/qa.jsonl \
+  --chunks out/aec_batch.jsonl --label aec-template-v1 \
+  --max-chars 1200 --overlap 0 --out-dir reports
+```
+
+每行一个 JSON 对象，字段为 `doc`、`index`、`text`、`start_offset`、`end_offset`、`heading_path`。`heading_path` 可以是字符串数组，也可以是用 ` > ` 连接的字符串。本仓库 `chunk` 子命令写出的 `doc_id` / `seq` / `start` / `end` 也能读；可选 `kind`（`text` / `table` / `code`）和 `chunk_id`。
+
+`--max-chars` 只参与超限率，以及「长度不超过上限 80%」的单元完整率，不会把外部块再切一次。不传时按最长块的字符数计。`--overlap` 只写入报告。`--strategies` 和 `--sizes` 在传入 `--chunks` 时不生效。
+
+```python
+from chinese_chunk.evaluate import evaluate_chunks, load_chunks_jsonl, load_corpus, load_qa
+
+docs = load_corpus("data/corpus")
+qa = load_qa("data/qa.jsonl")
+chunks = load_chunks_jsonl("out/aec_batch.jsonl")
+result = evaluate_chunks(docs, qa, chunks, label="aec-template-v1", max_chars=1200, overlap=0)
+```
+
 ## 评测口径
 
 - 检索器固定为字符二元组 BM25（k1=1.5，b=0.75），所有策略共用；评测只改变切片方式。
@@ -138,14 +163,15 @@ structure 把所有 1260 个可容纳的结构单元都保住了，recursive 有
 ## 测试与 CI
 
 ```bash
-python tests/test_smoke.py        # 离线冒烟，不需要语料
-python tests/test_invariants.py   # 切片不变量，需要 data/corpus
-python scripts/selfcheck.py       # 全量自查，需要 data/corpus
+python tests/test_smoke.py            # 离线冒烟，不需要语料
+python tests/test_external_chunks.py  # 外部切片加载与评测，不需要语料
+python tests/test_invariants.py       # 切片不变量，需要 data/corpus
+python scripts/selfcheck.py           # 全量自查，需要 data/corpus
 ```
 
 CI 分两个作业（`.github/workflows/ci.yml`）：
 
-- **离线检查**：Python 3.10 / 3.13 双版本，编译 + 离线冒烟 + 打包元数据 + CLI 可用性；
+- **离线检查**：Python 3.10 / 3.13 双版本，编译 + 离线冒烟 + 外部切片评测 + 打包元数据 + CLI 可用性；
 - **全量自查**：抓取语料后跑不变量与自查，产物上传为 artifact。因为语料抓取依赖外部
   站点，该作业只在推送 `main` 与手动触发时运行。
 
