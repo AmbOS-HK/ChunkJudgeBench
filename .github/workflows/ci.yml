@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    name: 离线检查 (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 安装（可编辑安装 + 抓取依赖）
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[fetch]"
+
+      - name: 语法编译
+        run: python -m compileall -q chinese_chunk scripts tests
+
+      - name: 离线冒烟（不需要语料）
+        run: python tests/test_smoke.py
+
+      - name: 打包元数据校验
+        run: python -m pip wheel . --no-deps -w dist
+
+      - name: CLI 可用
+        run: python -m chinese_chunk.cli --help
+
+  corpus:
+    name: 全量自查（联网抓语料）
+    # 语料抓取依赖多个外部站点，只在推 main 与手动触发时跑，避免 PR 因网络抖动变红
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 安装
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[fetch]"
+
+      - name: 抓取语料
+        run: python scripts/fetch_corpus.py
+
+      - name: 切片不变量
+        run: python tests/test_invariants.py
+
+      - name: 全量自查
+        run: python scripts/selfcheck.py
+
+      - name: 上传自查报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selfcheck-report
+          path: reports/
+          if-no-files-found: warn
